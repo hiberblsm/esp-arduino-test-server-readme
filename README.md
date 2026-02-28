@@ -19,11 +19,10 @@ Sunucu: `test.hibersoft.com.tr`
 
 ## Token Alma
 
-Master key ile gecici token uretilir:
+Her kullanici kendi benzersiz tokenini olusturur:
 
 ```bash
-curl -s -X POST http://test.hibersoft.com.tr:2884/token \
-  -H "x-api-key: PUBLIC_TEST_2026_ESP_ARDUINO"
+curl -s -X POST http://test.hibersoft.com.tr:2884/token
 ```
 
 Ornek cevap:
@@ -31,13 +30,15 @@ Ornek cevap:
 ```json
 {
   "ok": true,
+  "clientId": "c_xxxxxxxxxxxxxxxx",
   "token": "<TEMP_TOKEN>",
   "expiresAt": "2026-02-28T11:14:15.036Z",
   "ttlSec": 3600
 }
 ```
 
-Not: Tokenlar RAM'de tutulur. Sunucu restart olunca tokenlar silinir.
+Not: Tokenlar surelidir.
+Not: `/messages` endpointi sadece tokeni olusturan kullanicinin mesajlarini listeler.
 
 ## HTTP Test (2884)
 
