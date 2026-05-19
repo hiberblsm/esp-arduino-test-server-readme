@@ -1,6 +1,6 @@
 # ESP/Arduino Test Server (Public)
 
-Hiber Bilisim Test Server, ESP32, ESP8266 ve Arduino tabanli IoT cihazlar icin HTTP, TCP, UDP ve MQTT protokollerinde hizli baglanti ve veri gonderim testi yapmanizi saglayan public bir test ortamidir. Bu sayfa, Hiber Bilisim IoT test sunucusuna baglanmak, gecici token uretmek ve cihaz haberlesmesini dogrulamak icin gerekli tum adimlari icerir.
+Hiber Bilisim Test Server, ESP32, ESP8266 ve Arduino tabanli IoT cihazlar icin HTTP, TCP, UDP ve MQTT protokollerinde hizli baglanti ve veri gonderim testi yapmanizi saglayan public bir test ortamidir. Bu sayfa, Hiber Bilisim IoT test sunucusuna baglanmak, 24 saat gecerli token olusturmak ve cihaz haberlesmesini dogrulamak icin gerekli tum adimlari icerir.
 
 Bu repo, kullanicilarin hizli protokol testi yapmasi icin hazirlanmis basit bir test sunucusudur.
 
@@ -12,14 +12,27 @@ Sunucu: `test.hibersoft.com.tr`
 - UDP `2886`
 - MQTT `2887`
 
-## Test Akisi
-1. `POST /token` ile gecici token al
-2. Bu token ile HTTP/TCP/UDP testlerini yap
-3. `GET /messages` ile gelen mesajlari kontrol et
+## Kullanim Ozeti
+1. Tarayicida `https://test.hibersoft.com.tr/` adresini ac
+2. Ilk ekranda `Token Olustur` butonu ile 24 saat gecerli token al
+3. Ayni tokeni cihazinda HTTP, TCP, UDP veya MQTT testleri icin kullan
+4. Dashboard ekraninda gelen ve giden akisleri izle
+5. Istersen secili cihaz icin ozel HTTP cevabi hazirla veya MQTT downlink gonder
+
+Dashboard akisi ozellikle basit tutulmustur:
+
+- Ilk acilista sadece token olusturma / mevcut token girme ekrani gelir
+- Token olusmadan calisma ekrani acilmaz
+- Dashboard oturumu ile cihaz testleri ayni token uzerinden baglanir
+- Token ve clientId otomatik olusur; kullanici sadece tokeni cihaza yazar
+- Portlar sabittir ve dashboardda otomatik gosterilir
 
 ## Token Alma
 
-Her kullanici kendi benzersiz tokenini olusturur:
+Token iki farkli yoldan alinabilir:
+
+1. En kolay yol dashboard uzerindeki `Token Olustur` butonudur
+2. API ile almak istersen su endpoint kullanilir:
 
 ```bash
 curl -s -X POST http://test.hibersoft.com.tr:2884/token
@@ -33,12 +46,69 @@ Ornek cevap:
   "clientId": "c_xxxxxxxxxxxxxxxx",
   "token": "<TEMP_TOKEN>",
   "expiresAt": "2026-02-28T11:14:15.036Z",
-  "ttlSec": 3600
+  "ttlSec": 86400
 }
 ```
 
-Not: Tokenlar surelidir.
+Not: Tokenlar 24 saat gecerlidir.
 Not: `/messages` endpointi sadece tokeni olusturan kullanicinin mesajlarini listeler.
+
+## Dashboard
+
+Kullanici dashboard adresi:
+
+```bash
+https://test.hibersoft.com.tr/
+```
+
+Dashboard acildiginda ilk olarak token ekrani gelir. Burada ya yeni token olusturulur ya da mevcut token girilir. Token dogrulaninca dashboard calisma ekrani acilir. clientId otomatik atanir; kullanici clientId girmez.
+
+- HTTP, TCP, UDP ve token ile iliskilendirilmis MQTT trafiklerini gelen/giden sekmelerinde gosterir
+- Secilen `deviceId` icin bir sonraki HTTP `/ingest` cevabini tamamen sizin verdiginiz JSON ile doner
+- `devices/<deviceId>/downlink` topic'ine MQTT cihaz mesaji gonderir
+- Kullanici tokeni, clientId bilgisi ve sabit portlari tek ekranda gorebilir
+
+Kullanici tarafinda dashboard ic portu gorunmez. Web erisimi dogrudan alan adi uzerinden yapilir.
+
+Ozel HTTP cevap kuyrugu icin dashboard'in kullandigi API ornegi:
+
+```bash
+curl -s -X POST https://test.hibersoft.com.tr/dashboard/http-response \
+  -H "content-type: application/json" \
+  -H "x-api-key: <TEMP_TOKEN>" \
+  -d '{"deviceId":"esp32-http","status":202,"payload":{"ok":true,"echo":"custom","reply":"from-dashboard"}}'
+```
+
+Bu istekten sonra ayni token ile gelen ilk `/ingest` istegi asagidaki gibi sizin verdiginiz JSON ile cevaplanir:
+
+```json
+{
+  "ok": true,
+  "echo": "custom",
+  "reply": "from-dashboard"
+}
+```
+
+MQTT cihaz mesaji gonderimi icin API ornegi:
+
+```bash
+curl -s -X POST https://test.hibersoft.com.tr/dashboard/mqtt-publish \
+  -H "content-type: application/json" \
+  -H "x-api-key: <TEMP_TOKEN>" \
+  -d '{"deviceId":"esp32-mqtt","payload":{"command":"ping"}}'
+```
+
+MQTT publish'lerinin dashboard akisinda gorunmesi icin payload icine ayni token da eklenebilir:
+
+```json
+{
+  "deviceId": "esp32-mqtt",
+  "token": "<TEMP_TOKEN>",
+  "data": {
+    "humidity": 55
+  }
+}
+```
 
 ## HTTP Test (2884)
 
