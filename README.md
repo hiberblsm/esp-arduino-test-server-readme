@@ -45,12 +45,16 @@ Ornek cevap:
   "ok": true,
   "clientId": "c_xxxxxxxxxxxxxxxx",
   "token": "<TEMP_TOKEN>",
-  "expiresAt": "2026-02-28T11:14:15.036Z",
-  "ttlSec": 86400
+  "expiresAt": "2026-05-21T11:14:15.036Z",
+  "ttlSec": 86400,
+  "activeTokenCount": 3,
+  "maxActiveTokens": 1000
 }
 ```
 
-Not: Tokenlar 24 saat gecerlidir.
+Not: Tokenlar 24 saat gecerlidir. Sunucu en fazla 1000 aktif token tutar; dolunca en eski token silinir.
+Not: Token olusturma rate limit: dakikada 20 istek / IP.
+Not: Suresi gecmis tokenlar sunucu icinde her 60 saniyede otomatik temizlenir; ayrica cron her 5 dakikada bir calistirilir.
 Not: `/messages` endpointi sadece tokeni olusturan kullanicinin mesajlarini listeler.
 
 ## Dashboard
@@ -112,6 +116,8 @@ MQTT publish'lerinin dashboard akisinda gorunmesi icin payload icine ayni token 
 
 ## HTTP Test (2884)
 
+Rate limit: dakikada 120 istek / IP. Max body: 4096 byte.
+
 ```bash
 curl -s -X POST http://test.hibersoft.com.tr:2884/ingest \
   -H "content-type: application/json" \
@@ -119,15 +125,36 @@ curl -s -X POST http://test.hibersoft.com.tr:2884/ingest \
   -d '{"deviceId":"esp32-http","data":{"temp":24.5}}'
 ```
 
+Ornek varsayilan ACK cevabi:
+
+```json
+{
+  "ok": true,
+  "protocol": "http",
+  "deviceId": "esp32-http",
+  "ackAt": "2026-05-20T10:00:00.000Z"
+}
+```
+
+Dashboard uzerinden ozel cevap kuyruklanmissa o JSON ve status kodu doner.
+
 ## TCP Test (2885)
 
-Her mesaj JSON satiri olmali ve `\n` ile bitmelidir.
+Her mesaj JSON satiri olmali ve `\n` ile bitmelidir. Baglanti 30 saniye cevapsiz kalirsa otomatik kapanir.
 
 ```bash
 printf '{"token":"<TEMP_TOKEN>","deviceId":"esp32-tcp","data":{"voltage":3.3}}\n' | nc test.hibersoft.com.tr 2885
 ```
 
+Sunucu her basarili mesaja JSON ACK satiri doner:
+
+```json
+{"ok":true,"protocol":"tcp","deviceId":"esp32-tcp","ackAt":"2026-05-20T10:00:00.000Z"}
+```
+
 ## UDP Test (2886)
+
+Max paket: 4096 byte. Sunucu her basarili mesaja UDP datagram ile ACK gonderir.
 
 ```bash
 echo -n '{"token":"<TEMP_TOKEN>","deviceId":"esp32-udp","data":{"rssi":-67}}' | nc -u -w1 test.hibersoft.com.tr 2886
@@ -138,13 +165,31 @@ echo -n '{"token":"<TEMP_TOKEN>","deviceId":"esp32-udp","data":{"rssi":-67}}' | 
 MQTT kimlik bilgileri:
 - Username: `testuser`
 - Password: `PUBLIC_MQTT_2026_PASS`
-- Topic: `test/` veya `devices/` ile baslamali
+- Topic: `test/` veya `devices/` ile baslamali (diger topicler reddedilir)
+- Max payload: 4096 byte
 
 ```bash
 mosquitto_pub -h test.hibersoft.com.tr -p 2887 \
   -u "testuser" -P "PUBLIC_MQTT_2026_PASS" \
   -t "test/esp32-mqtt" \
   -m '{"deviceId":"esp32-mqtt","data":{"humidity":55}}'
+```
+
+## Saglik Kontrolu
+
+```bash
+curl -s http://test.hibersoft.com.tr:2884/health
+```
+
+Ornek cevap:
+
+```json
+{
+  "ok": true,
+  "env": "production",
+  "ports": { "http": 2884, "tcp": 2885, "udp": 2886, "mqtt": 2887 },
+  "uptimeSec": 3600
+}
 ```
 
 ## Mesajlari Listeleme
