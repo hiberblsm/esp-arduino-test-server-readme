@@ -1,38 +1,45 @@
-# ESP/Arduino Test Server (Public)
+# ESP / Arduino IoT Test Server
 
-Hiber Bilisim Test Server, ESP32, ESP8266 ve Arduino tabanli IoT cihazlar icin HTTP, TCP, UDP ve MQTT protokollerinde hizli baglanti ve veri gonderim testi yapmanizi saglayan public bir test ortamidir. Bu sayfa, Hiber Bilisim IoT test sunucusuna baglanmak, 24 saat gecerli token olusturmak ve cihaz haberlesmesini dogrulamak icin gerekli tum adimlari icerir.
+Bu proje ESP32, ESP8266, Arduino ve benzeri IoT cihazlari icin public test sunucusudur. HTTP, TCP, UDP ve MQTT ile veri alir; dashboard uzerinden token bazli cihaz trafigini gosterir ve cihaza HTTP cevabi ya da MQTT downlink mesaji gondermeyi saglar.
 
-Bu repo, kullanicilarin hizli protokol testi yapmasi icin hazirlanmis basit bir test sunucusudur.
+Public sunucu: `test.hibersoft.com.tr`
 
-Sunucu: `test.hibersoft.com.tr`
+## Portlar
 
-## Desteklenen Protokoller
-- HTTP `2884`
-- TCP `2885`
-- UDP `2886`
-- MQTT `2887`
+| Protokol | Port |
+| --- | ---: |
+| HTTP API | `2884` |
+| TCP | `2885` |
+| UDP | `2886` |
+| MQTT | `2887` |
+| Dashboard ic port | `5010` |
 
-## Kullanim Ozeti
-1. Tarayicida `https://test.hibersoft.com.tr/` adresini ac
-2. Ilk ekranda `Token Olustur` butonu ile 24 saat gecerli token al
-3. Ayni tokeni cihazinda HTTP, TCP, UDP veya MQTT testleri icin kullan
-4. Dashboard ekraninda gelen ve giden akisleri izle
-5. Istersen secili cihaz icin ozel HTTP cevabi hazirla veya MQTT downlink gonder
+Dashboard web adresi normalde reverse proxy ile alan adindan acilir:
 
-Dashboard akisi ozellikle basit tutulmustur:
+```text
+https://test.hibersoft.com.tr/
+```
 
-- Ilk acilista sadece token olusturma / mevcut token girme ekrani gelir
-- Token olusmadan calisma ekrani acilmaz
-- Dashboard oturumu ile cihaz testleri ayni token uzerinden baglanir
-- Token ve clientId otomatik olusur; kullanici sadece tokeni cihaza yazar
-- Portlar sabittir ve dashboardda otomatik gosterilir
+## Hizli Kullanim
+
+1. `https://test.hibersoft.com.tr/` adresini ac.
+2. `24 saatlik token olustur` butonu ile token al.
+3. Tokeni cihaza yaz.
+4. Cihaz HTTP, TCP, UDP veya MQTT ile veri gondersin.
+5. Dashboard'da `Gelen akis`, `Giden akis`, `Token cihazlari` ve `Bekleyen HTTP cevaplari` alanlarindan trafigi izle.
+6. Gerekirse dashboard'dan ayni `deviceId` icin HTTP cevabi kuyrukla veya MQTT downlink gonder.
+
+Tokenlar 24 saat gecerlidir. Token suresi dolunca yeni token alinmalidir.
 
 ## Token Alma
 
-Token iki farkli yoldan alinabilir:
+### Otomatik token
 
-1. En kolay yol dashboard uzerindeki `Token Olustur` butonudur
-2. API ile almak istersen su endpoint kullanilir:
+Dashboard acildiginda `24 saatlik token olustur` butonuna bas. Sistem token ve `clientId` bilgisini otomatik olusturur. Cihaza sadece token yazman yeterlidir.
+
+### Manuel token API
+
+HTTP API ile token almak icin:
 
 ```bash
 curl -s -X POST http://test.hibersoft.com.tr:2884/token
@@ -43,137 +50,206 @@ Ornek cevap:
 ```json
 {
   "ok": true,
-  "clientId": "c_xxxxxxxxxxxxxxxx",
-  "token": "<TEMP_TOKEN>",
-  "expiresAt": "2026-05-21T11:14:15.036Z",
+  "token": "TEMP_TOKEN",
+  "clientId": "c_0123456789abcdef",
+  "expiresAt": "2026-06-15T10:00:00.000Z",
   "ttlSec": 86400,
-  "activeTokenCount": 3,
+  "activeTokenCount": 1,
   "maxActiveTokens": 1000
 }
 ```
 
-Not: Tokenlar 24 saat gecerlidir. Sunucu en fazla 1000 aktif token tutar; dolunca en eski token silinir.
-Not: Token olusturma rate limit: dakikada 20 istek / IP.
-Not: Suresi gecmis tokenlar sunucu icinde her 60 saniyede otomatik temizlenir; ayrica cron her 5 dakikada bir calistirilir.
-Not: `/messages` endpointi sadece tokeni olusturan kullanicinin mesajlarini listeler.
-
-## Dashboard
-
-Kullanici dashboard adresi:
+Var olan tokeni kontrol etmek icin:
 
 ```bash
-https://test.hibersoft.com.tr/
+curl -s http://test.hibersoft.com.tr:2884/token/verify \
+  -H "x-api-key: TEMP_TOKEN"
 ```
 
-Dashboard acildiginda ilk olarak token ekrani gelir. Burada ya yeni token olusturulur ya da mevcut token girilir. Token dogrulaninca dashboard calisma ekrani acilir. clientId otomatik atanir; kullanici clientId girmez.
+## Dashboard Kullanimi
 
-- HTTP, TCP, UDP ve token ile iliskilendirilmis MQTT trafiklerini gelen/giden sekmelerinde gosterir
-- Secilen `deviceId` icin bir sonraki HTTP `/ingest` cevabini tamamen sizin verdiginiz JSON ile doner
-- `devices/<deviceId>/downlink` topic'ine MQTT cihaz mesaji gonderir
-- Kullanici tokeni, clientId bilgisi ve sabit portlari tek ekranda gorebilir
+Dashboard token olmadan acilmaz. Yeni token olusturabilir veya var olan tokeni girebilirsin. Token dogrulaninca:
 
-Kullanici tarafinda dashboard ic portu gorunmez. Web erisimi dogrudan alan adi uzerinden yapilir.
+- `clientId`, token bitis zamani ve sabit portlar gorunur.
+- `Gelen akis` token ile gelen HTTP, TCP, UDP ve tokenli MQTT mesajlarini listeler.
+- `Giden akis` dashboard'dan cihaza gonderilen HTTP cevaplarini ve MQTT downlink mesajlarini listeler.
+- `Token cihazlari` bu token ile veri gonderen cihazlari, kullandiklari protokolleri ve son payload'i gosterir.
+- `Izlenen deviceId` filtresi ile tek cihaz trafigi izlenebilir.
+- Cihaz satirindaki `Sec` butonu deviceId bilgisini filtreye, HTTP cevap formuna ve MQTT formuna tasir.
 
-Ozel HTTP cevap kuyrugu icin dashboard'in kullandigi API ornegi:
+## HTTP ile Veri Gonderme
 
-```bash
-curl -s -X POST https://test.hibersoft.com.tr/dashboard/http-response \
-  -H "content-type: application/json" \
-  -H "x-api-key: <TEMP_TOKEN>" \
-  -d '{"deviceId":"esp32-http","status":202,"payload":{"ok":true,"echo":"custom","reply":"from-dashboard"}}'
+Endpoint:
+
+```text
+POST http://test.hibersoft.com.tr:2884/ingest
 ```
 
-Bu istekten sonra ayni token ile gelen ilk `/ingest` istegi asagidaki gibi sizin verdiginiz JSON ile cevaplanir:
-
-```json
-{
-  "ok": true,
-  "echo": "custom",
-  "reply": "from-dashboard"
-}
-```
-
-MQTT cihaz mesaji gonderimi icin API ornegi:
-
-```bash
-curl -s -X POST https://test.hibersoft.com.tr/dashboard/mqtt-publish \
-  -H "content-type: application/json" \
-  -H "x-api-key: <TEMP_TOKEN>" \
-  -d '{"deviceId":"esp32-mqtt","payload":{"command":"ping"}}'
-```
-
-MQTT publish'lerinin dashboard akisinda gorunmesi icin payload icine ayni token da eklenebilir:
-
-```json
-{
-  "deviceId": "esp32-mqtt",
-  "token": "<TEMP_TOKEN>",
-  "data": {
-    "humidity": 55
-  }
-}
-```
-
-## HTTP Test (2884)
-
-Rate limit: dakikada 120 istek / IP. Max body: 4096 byte.
+Token `x-api-key` header'i ile gonderilir:
 
 ```bash
 curl -s -X POST http://test.hibersoft.com.tr:2884/ingest \
   -H "content-type: application/json" \
-  -H "x-api-key: <TEMP_TOKEN>" \
-  -d '{"deviceId":"esp32-http","data":{"temp":24.5}}'
+  -H "x-api-key: TEMP_TOKEN" \
+  -d '{"deviceId":"esp32-http","data":{"temp":24.5,"relay":0}}'
 ```
 
-Ornek varsayilan ACK cevabi:
+Varsayilan cevap:
 
 ```json
 {
   "ok": true,
   "protocol": "http",
   "deviceId": "esp32-http",
-  "ackAt": "2026-05-20T10:00:00.000Z"
+  "ackAt": "2026-06-14T10:00:00.000Z"
 }
 ```
 
-Dashboard uzerinden ozel cevap kuyruklanmissa o JSON ve status kodu doner.
+Dashboard'da ayni `deviceId` icin ozel HTTP cevabi kuyruklanmissa, cihaz bir sonraki `/ingest` isteginde bu JSON'u alir. Bu yontem HTTP cihazlara komut veya ayar cevabi gondermek icindir.
 
-## TCP Test (2885)
+## Dashboard'dan HTTP Cevabi Gonderme
 
-Her mesaj JSON satiri olmali ve `\n` ile bitmelidir. Baglanti 30 saniye cevapsiz kalirsa otomatik kapanir.
+Dashboard formundan:
+
+1. `HTTP cevap kuyrugu` alanina `deviceId` yaz.
+2. Donmesini istedigin HTTP status kodunu sec.
+3. JSON body alanina cihazin alacagi cevabi yaz.
+4. `Cevabi siraya al` butonuna bas.
+
+API ile ayni islem:
 
 ```bash
-printf '{"token":"<TEMP_TOKEN>","deviceId":"esp32-tcp","data":{"voltage":3.3}}\n' | nc test.hibersoft.com.tr 2885
+curl -s -X POST https://test.hibersoft.com.tr/dashboard/http-response \
+  -H "content-type: application/json" \
+  -H "x-api-key: TEMP_TOKEN" \
+  -d '{"deviceId":"esp32-http","status":202,"payload":{"ok":true,"command":"relay_on"}}'
 ```
 
-Sunucu her basarili mesaja JSON ACK satiri doner:
+Bundan sonra `esp32-http` deviceId'si ayni token ile `/ingest` yaptiginda cevap:
 
 ```json
-{"ok":true,"protocol":"tcp","deviceId":"esp32-tcp","ackAt":"2026-05-20T10:00:00.000Z"}
+{
+  "ok": true,
+  "command": "relay_on"
+}
 ```
 
-## UDP Test (2886)
+Not: HTTP cevaplari kuyruktadir. Her kuyruk kaydi ilgili cihaz tarafindan bir kez alininca silinir.
 
-Max paket: 4096 byte. Sunucu her basarili mesaja UDP datagram ile ACK gonderir.
+## TCP ile Veri Gonderme
+
+TCP mesajlari JSON satiri olmali ve `\n` ile bitmelidir. Token body icinde `token` alaninda gider.
 
 ```bash
-echo -n '{"token":"<TEMP_TOKEN>","deviceId":"esp32-udp","data":{"rssi":-67}}' | nc -u -w1 test.hibersoft.com.tr 2886
+printf '{"token":"TEMP_TOKEN","deviceId":"esp32-tcp","data":{"voltage":3.3}}\n' \
+  | nc test.hibersoft.com.tr 2885
 ```
 
-## MQTT Test (2887)
+Basarili cevap:
+
+```json
+{"ok":true,"protocol":"tcp","deviceId":"esp32-tcp","ackAt":"2026-06-14T10:00:00.000Z"}
+```
+
+## UDP ile Veri Gonderme
+
+UDP paketi JSON olmali ve token body icinde `token` alaninda gider.
+
+```bash
+echo -n '{"token":"TEMP_TOKEN","deviceId":"esp32-udp","data":{"rssi":-67}}' \
+  | nc -u -w1 test.hibersoft.com.tr 2886
+```
+
+Sunucu basarili pakete UDP ACK datagram'i dondurur.
+
+## MQTT ile Veri Gonderme
 
 MQTT kimlik bilgileri:
-- Username: `testuser`
-- Password: `PUBLIC_MQTT_2026_PASS`
-- Topic: `test/` veya `devices/` ile baslamali (diger topicler reddedilir)
-- Max payload: 4096 byte
+
+```text
+username: testuser
+password: PUBLIC_MQTT_2026_PASS
+```
+
+Izinli topic prefixleri:
+
+```text
+test/
+devices/
+```
+
+MQTT publish ornegi:
 
 ```bash
 mosquitto_pub -h test.hibersoft.com.tr -p 2887 \
   -u "testuser" -P "PUBLIC_MQTT_2026_PASS" \
-  -t "test/esp32-mqtt" \
-  -m '{"deviceId":"esp32-mqtt","data":{"humidity":55}}'
+  -t "devices/esp32-mqtt/uplink" \
+  -m '{"token":"TEMP_TOKEN","deviceId":"esp32-mqtt","data":{"humidity":55}}'
 ```
+
+MQTT mesajinin dashboard'da ilgili token altinda gorunmesi icin payload icinde `token` bulunmalidir. Token yoksa MQTT mesaj kabul edilir ama dashboard oturumuna baglanamaz.
+
+## Dashboard'dan MQTT Downlink Gonderme
+
+Dashboard formundan:
+
+1. `MQTT downlink` alanina `deviceId` yaz.
+2. JSON data alanina cihaza gidecek komutu yaz.
+3. `MQTT gonder` butonuna bas.
+
+Sunucu su topic'e publish eder:
+
+```text
+devices/<deviceId>/downlink
+```
+
+API ile gonderim:
+
+```bash
+curl -s -X POST https://test.hibersoft.com.tr/dashboard/mqtt-publish \
+  -H "content-type: application/json" \
+  -H "x-api-key: TEMP_TOKEN" \
+  -d '{"deviceId":"esp32-mqtt","payload":{"command":"ping","relay":1}}'
+```
+
+Cihazin dinlemesi gereken topic:
+
+```bash
+mosquitto_sub -h test.hibersoft.com.tr -p 2887 \
+  -u "testuser" -P "PUBLIC_MQTT_2026_PASS" \
+  -t "devices/esp32-mqtt/downlink"
+```
+
+Downlink payload format:
+
+```json
+{
+  "deviceId": "esp32-mqtt",
+  "data": {
+    "command": "ping",
+    "relay": 1
+  },
+  "sentAt": "2026-06-14T10:00:00.000Z"
+}
+```
+
+## Gelen Verileri Listeleme
+
+HTTP API ile tokena ait mesajlari almak icin:
+
+```bash
+curl -s http://test.hibersoft.com.tr:2884/messages \
+  -H "x-api-key: TEMP_TOKEN"
+```
+
+Dashboard'un kullandigi canli veri endpoint'i:
+
+```bash
+curl -s https://test.hibersoft.com.tr/dashboard/data \
+  -H "x-api-key: TEMP_TOKEN"
+```
+
+Bu endpoint session, portlar, istatistikler, trafik, bekleyen HTTP cevaplari ve token cihazlarini dondurur.
 
 ## Saglik Kontrolu
 
@@ -187,14 +263,52 @@ Ornek cevap:
 {
   "ok": true,
   "env": "production",
-  "ports": { "http": 2884, "tcp": 2885, "udp": 2886, "mqtt": 2887 },
+  "host": "0.0.0.0",
+  "ports": {
+    "http": 2884,
+    "tcp": 2885,
+    "udp": 2886,
+    "mqtt": 2887
+  },
   "uptimeSec": 3600
 }
 ```
 
-## Mesajlari Listeleme
+## Sunucu Yonetimi
+
+aapanel icin calistirma komutu:
 
 ```bash
-curl -s http://test.hibersoft.com.tr:2884/messages \
-  -H "x-api-key: <TEMP_TOKEN>"
+bash /www/wwwroot/node_project/test-server/scripts/start.sh
 ```
+
+`start.sh` davranisi:
+
+- Sunucu calismiyorsa start eder.
+- PID dosyasi veya portlardan calistigini gorurse once durdurur, sonra tekrar baslatir.
+- PID dosyasini `.runtime/iot-server.pid` icinde tutar.
+- Eski `/tmp/iot-server.pid` dosyasi varsa stop tarafinda yine okunur.
+- Loglari `/www/wwwlogs/iot-test-server.log` dosyasina yazar ve son loglari komut ciktisinda gosterir.
+
+Manuel komutlar:
+
+```bash
+npm run start
+npm run stop
+npm run restart
+```
+
+Canli log:
+
+```bash
+tail -f /www/wwwlogs/iot-test-server.log
+```
+
+## Limitler
+
+- Max body/paket: `4096` byte
+- HTTP rate limit: IP basina dakikada `120` istek
+- Token olusturma rate limit: IP basina dakikada `20` istek
+- Token TTL: `86400` saniye
+- Max aktif token: `1000`
+- Max mesaj gecmisi: `200`
