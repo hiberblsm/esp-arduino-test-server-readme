@@ -274,36 +274,6 @@ Ornek cevap:
 }
 ```
 
-## Sunucu Yonetimi
-
-aapanel icin calistirma komutu:
-
-```bash
-bash /www/wwwroot/node_project/test-server/scripts/start.sh
-```
-
-`start.sh` davranisi:
-
-- Sunucu calismiyorsa start eder.
-- PID dosyasi veya portlardan calistigini gorurse once durdurur, sonra tekrar baslatir.
-- PID dosyasini `.runtime/iot-server.pid` icinde tutar.
-- Eski `/tmp/iot-server.pid` dosyasi varsa stop tarafinda yine okunur.
-- Loglari `/www/wwwlogs/iot-test-server.log` dosyasina yazar ve son loglari komut ciktisinda gosterir.
-
-Manuel komutlar:
-
-```bash
-npm run start
-npm run stop
-npm run restart
-```
-
-Canli log:
-
-```bash
-tail -f /www/wwwlogs/iot-test-server.log
-```
-
 ## Limitler
 
 - Max body/paket: `4096` byte
